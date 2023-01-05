@@ -20,8 +20,8 @@ namespace NeonEraser
         private static readonly MethodInfo OnLeaderboardScoreUploaded2Info = typeof(LeaderboardIntegrationSteam).
             GetMethod("OnLeaderboardScoreUploaded2", BindingFlags.NonPublic | BindingFlags.Static);
 
-        private static List<CallResult<LeaderboardFindResult_t>> findResults = new List<CallResult<LeaderboardFindResult_t>>();
-        private static List<CallResult<LeaderboardScoreUploaded_t>> upload = new List<CallResult<LeaderboardScoreUploaded_t>>();
+        private readonly static List<CallResult<LeaderboardFindResult_t>> findResults = new();
+        private readonly static List<CallResult<LeaderboardScoreUploaded_t>> upload = new();
 
 
         public override void OnUpdate()
