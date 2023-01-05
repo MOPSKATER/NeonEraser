@@ -1,4 +1,5 @@
 ﻿using Steamworks;
+using System.Diagnostics;
 using System.Reflection;
 using UnityEngine.InputSystem;
 
@@ -28,10 +29,6 @@ namespace NeonEraser
                 leaderboardScoreUploadedResult2 = (CallResult<LeaderboardScoreUploaded_t>)typeof(LeaderboardIntegrationSteam).
                     GetField("leaderboardScoreUploadedResult2", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
             }
-
-            GameDataManager.levelStats["GRID_EXTERMINATOR"]._timeBestMicroseconds = NEWTIMELOCAL;
-            GameDataManager.SaveGame();
-            Erase("GRID_EXTERMINATOR");
         }
 
         private void EraseAll()
@@ -43,10 +40,18 @@ namespace NeonEraser
                         Erase(level.levelID);
         }
 
-        private void Erase(string boardName)
+        private void Erase(string levelID)
         {
-            SteamAPICall_t hAPICall = SteamUserStats.FindOrCreateLeaderboard(boardName, ELeaderboardSortMethod.k_ELeaderboardSortMethodAscending, ELeaderboardDisplayType.k_ELeaderboardDisplayTypeTimeMilliSeconds);
+            GameDataManager.levelStats[levelID]._timeBestMicroseconds = NEWTIMELOCAL;
+            GameDataManager.levelStats[levelID]._timeLastMicroseconds = NEWTIMELOCAL;
+            GameDataManager.SaveGame();
+
+            SteamAPICall_t hAPICall = SteamUserStats.FindOrCreateLeaderboard(levelID, ELeaderboardSortMethod.k_ELeaderboardSortMethodAscending, ELeaderboardDisplayType.k_ELeaderboardDisplayTypeTimeMilliSeconds);
             findLeaderboardForUpload.Set(hAPICall, null);
+        }
+
+        private void OverrideLevelLocally(string levelID)
+        {
         }
 
         private static void OverrideScore(LeaderboardFindResult_t pCallback, bool bIOFailure)
