@@ -39,7 +39,6 @@ namespace NeonEraser
             MethodInfo target = typeof(MenuButtonLevel).GetMethod("SetLevelData", BindingFlags.Public | BindingFlags.Instance);
             HarmonyMethod patch = new(GetType().GetMethod("PostSetLevelData", BindingFlags.Public | BindingFlags.Static));
             harmony.Patch(target, null, patch);
-            Debug.Log("Done");
         }
 
         private bool runOnce = true;
@@ -64,7 +63,6 @@ namespace NeonEraser
 
         public static void PostSetLevelData(MenuButtonLevel __instance, LevelData ld)
         {
-            Debug.Log("Doing stuff " + ld.levelID);
             GameObject eraseButton = Utils.InstantiateUI(__instance.gameObject.transform.Find("Icon Holder/Medal Box").gameObject,
                 "EraseButton",
                 __instance.gameObject.transform);
