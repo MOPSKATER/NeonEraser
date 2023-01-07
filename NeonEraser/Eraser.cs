@@ -89,8 +89,6 @@ namespace NeonEraser
 
         internal void EraseAll()
         {
-            Debug.Log("Erasing all data");
-            return;
             GameData gameData = Singleton<Game>.Instance.GetGameData();
             foreach (var campaign in gameData.campaigns)
                 foreach (var missionData in campaign.missionData)
