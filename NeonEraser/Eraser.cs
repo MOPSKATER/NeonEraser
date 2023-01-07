@@ -2,6 +2,7 @@
 using Steamworks;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace NeonEraser
 {
@@ -32,11 +33,33 @@ namespace NeonEraser
             leaderboardScoreUploadedResult2 = (CallResult<LeaderboardScoreUploaded_t>)typeof(LeaderboardIntegrationSteam).
                 GetField("leaderboardScoreUploadedResult2", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
 
+
             HarmonyLib.Harmony harmony = new("de.MOPSKATER.NeonEraser");
 
             MethodInfo target = typeof(MenuButtonLevel).GetMethod("SetLevelData", BindingFlags.Public | BindingFlags.Instance);
             HarmonyMethod patch = new(GetType().GetMethod("PostSetLevelData", BindingFlags.Public | BindingFlags.Static));
             harmony.Patch(target, null, patch);
+            Debug.Log("Done");
+        }
+
+        private bool runOnce = true;
+
+        public override void OnSceneWasLoaded(int buildIndex, string sceneName)
+        {
+            if (!runOnce) return;
+
+            MenuScreenTitle titleScreen = (MenuScreenTitle)MainMenu.Instance()._screenTitle;
+            GameObject eraseAllButton = Utils.InstantiateUI(
+                titleScreen.buttonsToLoad[4].gameObject,
+                "EraseAll",
+                titleScreen.levelRushButton.transform.parent);
+            MenuButtonHolder buttonHolder = eraseAllButton.GetComponent<MenuButtonHolder>();
+            titleScreen.buttonsToLoad.Add(buttonHolder);
+            UnityEngine.UI.Button button = buttonHolder.ButtonRef;
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(EraseAllAntiMissclick);
+            buttonHolder.buttonTextRef.SetText("Erase all levels");
+            runOnce = false;
         }
 
         public static void PostSetLevelData(MenuButtonLevel __instance, LevelData ld)
@@ -55,8 +78,19 @@ namespace NeonEraser
             findLeaderboardForUploadGlobal.Set(hAPICall, null);
         }
 
+        private void EraseAllAntiMissclick()
+        {
+            if (Keyboard.current.leftCtrlKey.isPressed)
+            {
+                EraseAll();
+                return;
+            }
+        }
+
         internal void EraseAll()
         {
+            Debug.Log("Erasing all data");
+            return;
             GameData gameData = Singleton<Game>.Instance.GetGameData();
             foreach (var campaign in gameData.campaigns)
                 foreach (var missionData in campaign.missionData)
