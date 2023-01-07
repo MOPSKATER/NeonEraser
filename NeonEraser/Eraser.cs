@@ -64,9 +64,11 @@ namespace NeonEraser
 
         public static void PostSetLevelData(MenuButtonLevel __instance, LevelData ld)
         {
+            Debug.Log("Doing stuff " + ld.levelID);
             GameObject eraseButton = Utils.InstantiateUI(__instance.gameObject.transform.Find("Icon Holder/Medal Box").gameObject,
                 "EraseButton",
                 __instance.gameObject.transform);
+            eraseButton.SetActive(true);
             UnityEngine.Object.Destroy(eraseButton.transform.Find("Medal Icon").gameObject);
             eraseButton.transform.localPosition = new Vector3(eraseButton.transform.localPosition.x, 0, eraseButton.transform.localPosition.z);
             eraseButton.AddComponent<MenuButtonEraser>().Setup(ld.levelID);
