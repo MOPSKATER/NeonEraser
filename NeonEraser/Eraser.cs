@@ -1,7 +1,7 @@
-﻿using Steamworks;
+﻿using HarmonyLib;
+using Steamworks;
 using System.Reflection;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace NeonEraser
 {
@@ -9,6 +9,7 @@ namespace NeonEraser
     {
         private const int NEWTIMEUPLOAD = 600000;
         private const long NEWTIMELOCAL = 600000000;
+        internal static Eraser eraser;
 
         private readonly CallResult<LeaderboardFindResult_t> findLeaderboardForUploadGlobal =
             CallResult<LeaderboardFindResult_t>.Create
@@ -24,29 +25,37 @@ namespace NeonEraser
         private readonly static List<CallResult<LeaderboardScoreUploaded_t>> upload = new();
 
 
-        public override void OnUpdate()
+        public override void OnLateInitializeMelon()
         {
+            eraser = this;
+            typeof(LeaderboardIntegrationSteam).GetMethod("Initialize", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[0]);
+            leaderboardScoreUploadedResult2 = (CallResult<LeaderboardScoreUploaded_t>)typeof(LeaderboardIntegrationSteam).
+                GetField("leaderboardScoreUploadedResult2", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
 
-            if (Keyboard.current.tKey.wasPressedThisFrame)
-            {
-                findResults.Clear();
-                upload.Clear();
-                if (leaderboardScoreUploadedResult2 == null)
-                {
-                    typeof(LeaderboardIntegrationSteam).GetMethod("Initialize", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[0]);
-                    leaderboardScoreUploadedResult2 = (CallResult<LeaderboardScoreUploaded_t>)typeof(LeaderboardIntegrationSteam).
-                        GetField("leaderboardScoreUploadedResult2", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
-                }
-            }
+            HarmonyLib.Harmony harmony = new("de.MOPSKATER.NeonEraser");
 
-            if (Keyboard.current.uKey.wasPressedThisFrame)
-            {
-                SteamAPICall_t hAPICall = SteamUserStats.FindOrCreateLeaderboard("GlobalNeonRankings", ELeaderboardSortMethod.k_ELeaderboardSortMethodAscending, ELeaderboardDisplayType.k_ELeaderboardDisplayTypeTimeMilliSeconds);
-                findLeaderboardForUploadGlobal.Set(hAPICall, null);
-            }
+            MethodInfo target = typeof(MenuButtonLevel).GetMethod("SetLevelData", BindingFlags.Public | BindingFlags.Instance);
+            HarmonyMethod patch = new(GetType().GetMethod("PostSetLevelData", BindingFlags.Public | BindingFlags.Static));
+            harmony.Patch(target, null, patch);
         }
 
-        private void EraseAll()
+        public static void PostSetLevelData(MenuButtonLevel __instance, LevelData ld)
+        {
+            GameObject eraseButton = Utils.InstantiateUI(__instance.gameObject.transform.Find("Icon Holder/Medal Box").gameObject,
+                "EraseButton",
+                __instance.gameObject.transform);
+            UnityEngine.Object.Destroy(eraseButton.transform.Find("Medal Icon").gameObject);
+            eraseButton.transform.localPosition = new Vector3(eraseButton.transform.localPosition.x, 0, eraseButton.transform.localPosition.z);
+            eraseButton.AddComponent<MenuButtonEraser>().Setup(ld.levelID);
+        }
+
+        public void AdjustLeaderboard()
+        {
+            SteamAPICall_t hAPICall = SteamUserStats.FindOrCreateLeaderboard("GlobalNeonRankings", ELeaderboardSortMethod.k_ELeaderboardSortMethodAscending, ELeaderboardDisplayType.k_ELeaderboardDisplayTypeTimeMilliSeconds);
+            findLeaderboardForUploadGlobal.Set(hAPICall, null);
+        }
+
+        internal void EraseAll()
         {
             GameData gameData = Singleton<Game>.Instance.GetGameData();
             foreach (var campaign in gameData.campaigns)
@@ -55,7 +64,7 @@ namespace NeonEraser
                         Erase(level.levelID);
         }
 
-        private void Erase(string levelID)
+        internal void Erase(string levelID)
         {
             SteamAPICall_t hAPICall = SteamUserStats.FindOrCreateLeaderboard(levelID, ELeaderboardSortMethod.k_ELeaderboardSortMethodAscending, ELeaderboardDisplayType.k_ELeaderboardDisplayTypeTimeMilliSeconds);
             var result = CallResult<LeaderboardFindResult_t>.Create
