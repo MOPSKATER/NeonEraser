@@ -61,7 +61,7 @@ namespace NeonEraser
             runOnce = false;
         }
 
-        public static void PostSetLevelData(MenuButtonLevel __instance, LevelData ld)
+        public static void PostSetLevelData(MenuButtonLevel __instance, LevelData ld) // TODO set custom icon to fix empty backround
         {
             GameObject eraseButton = Utils.InstantiateUI(__instance.gameObject.transform.Find("Icon Holder/Medal Box").gameObject,
                 "EraseButton",
