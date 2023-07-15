@@ -1,8 +1,11 @@
 ﻿using HarmonyLib;
 using Steamworks;
 using System.Reflection;
+using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
+using static MelonLoader.MelonLaunchOptions;
 
 namespace NeonEraser
 {
@@ -12,10 +15,11 @@ namespace NeonEraser
         private const long NEWTIMELOCAL = 600000000;
         internal static Eraser eraser;
 
-        private readonly CallResult<LeaderboardFindResult_t> findLeaderboardForUploadGlobal =
-            CallResult<LeaderboardFindResult_t>.Create
-            (new CallResult<LeaderboardFindResult_t>.APIDispatchDelegate
-                (AdjustGlobal));
+        //private readonly CallResult<LeaderboardFindResult_t> findLeaderboardForUploadGlobal =
+        //    CallResult<LeaderboardFindResult_t>.Create
+        //    (new CallResult<LeaderboardFindResult_t>.APIDispatchDelegate
+        //        (AdjustGlobal));
+
         private static CallResult<LeaderboardScoreUploaded_t> leaderboardScoreUploadedResult2;
 
 
@@ -25,8 +29,13 @@ namespace NeonEraser
         private readonly static List<CallResult<LeaderboardFindResult_t>> findResults = new();
         private readonly static List<CallResult<LeaderboardScoreUploaded_t>> upload = new();
 
+        private static bool buttonEraseAllCreated = false;
 
-        public override void OnLateInitializeMelon()
+        private static GameObject buttonEraseRush = null;
+        private static readonly FieldInfo m_levelRushType = typeof(MenuScreenLevelRush).GetField("m_levelRushType", BindingFlags.NonPublic | BindingFlags.Instance);
+
+
+        public override void OnApplicationLateStart()
         {
             eraser = this;
             typeof(LeaderboardIntegrationSteam).GetMethod("Initialize", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[0]);
@@ -36,16 +45,24 @@ namespace NeonEraser
 
             HarmonyLib.Harmony harmony = new("de.MOPSKATER.NeonEraser");
 
+            // IL buttons
             MethodInfo target = typeof(MenuButtonLevel).GetMethod("SetLevelData", BindingFlags.Public | BindingFlags.Instance);
             HarmonyMethod patch = new(GetType().GetMethod("PostSetLevelData", BindingFlags.Public | BindingFlags.Static));
             harmony.Patch(target, null, patch);
-        }
 
-        private bool runOnce = true;
+            // Rush buttons
+            target = typeof(MenuScreenLevelRush).GetMethod("OnSelectRush", BindingFlags.Public | BindingFlags.Instance);
+            patch = new(GetType().GetMethod("PostOnSelectRush", BindingFlags.Public | BindingFlags.Static));
+            harmony.Patch(target, null, patch);
+
+            target = typeof(MenuScreenLevelRush).GetMethod("OnHardModeToggle", BindingFlags.Public | BindingFlags.Instance);
+            patch = new(GetType().GetMethod("PostOnHardModeToggle", BindingFlags.Public | BindingFlags.Static));
+            harmony.Patch(target, null, patch);
+        }
 
         public override void OnSceneWasLoaded(int buildIndex, string sceneName)
         {
-            if (!runOnce) return;
+            if (buttonEraseAllCreated) return;
 
             MenuScreenTitle titleScreen = (MenuScreenTitle)MainMenu.Instance()._screenTitle;
             GameObject eraseAllButton = Utils.InstantiateUI(
@@ -54,11 +71,11 @@ namespace NeonEraser
                 titleScreen.levelRushButton.transform.parent);
             MenuButtonHolder buttonHolder = eraseAllButton.GetComponent<MenuButtonHolder>();
             titleScreen.buttonsToLoad.Add(buttonHolder);
-            UnityEngine.UI.Button button = buttonHolder.ButtonRef;
+            Button button = buttonHolder.ButtonRef;
             button.onClick.RemoveAllListeners();
             button.onClick.AddListener(EraseAllAntiMissclick);
             buttonHolder.buttonTextRef.SetText("Erase all levels");
-            runOnce = false;
+            buttonEraseAllCreated = true;
         }
 
         public static void PostSetLevelData(MenuButtonLevel __instance, LevelData ld) // TODO set custom icon to fix empty backround
@@ -70,12 +87,6 @@ namespace NeonEraser
             UnityEngine.Object.Destroy(eraseButton.transform.Find("Medal Icon").gameObject);
             eraseButton.transform.localPosition = new Vector3(eraseButton.transform.localPosition.x, 0, eraseButton.transform.localPosition.z);
             eraseButton.AddComponent<MenuButtonEraser>().Setup(ld.levelID);
-        }
-
-        public void AdjustLeaderboard()
-        {
-            SteamAPICall_t hAPICall = SteamUserStats.FindOrCreateLeaderboard("GlobalNeonRankings", ELeaderboardSortMethod.k_ELeaderboardSortMethodAscending, ELeaderboardDisplayType.k_ELeaderboardDisplayTypeTimeMilliSeconds);
-            findLeaderboardForUploadGlobal.Set(hAPICall, null);
         }
 
         private void EraseAllAntiMissclick()
@@ -102,6 +113,7 @@ namespace NeonEraser
             var result = CallResult<LeaderboardFindResult_t>.Create
             (new CallResult<LeaderboardFindResult_t>.APIDispatchDelegate
                 (OverrideScore));
+
             result.Set(hAPICall);
             findResults.Add(result);
 
@@ -122,6 +134,7 @@ namespace NeonEraser
             var result = CallResult<LeaderboardScoreUploaded_t>.Create
                 (new CallResult<LeaderboardScoreUploaded_t>.APIDispatchDelegate
                 (OnLeaderboardScoreUploaded2));
+
             result.Set(hAPICall);
             upload.Add(result);
         }
@@ -143,6 +156,95 @@ namespace NeonEraser
 
             SteamAPICall_t hAPICall = SteamUserStats.UploadLeaderboardScore(pCallback.m_hSteamLeaderboard, ELeaderboardUploadScoreMethod.k_ELeaderboardUploadScoreMethodForceUpdate, nScore, pScoreDetails, 1);
             leaderboardScoreUploadedResult2.Set(hAPICall, null);
+        }
+
+        public static void PostOnSelectRush(ref MenuScreenLevelRush __instance)
+        {
+            if (buttonEraseRush == null)
+            {
+                buttonEraseRush = Utils.InstantiateUI(
+                    __instance.startRushButton.gameObject,
+                    "Rush Eraser",
+                    __instance.startRushButton.transform.parent);
+                buttonEraseRush.transform.localPosition += new Vector3(0f, -70f, 0f);
+                Button btn = buttonEraseRush.GetComponent<Button>();
+                btn.onClick.RemoveAllListeners();
+                btn.onClick.AddListener(EraseRushAntiMissclick);
+            }
+            UpdateRushEraser(__instance);
+        }
+
+        public static void PostOnHardModeToggle(ref MenuScreenLevelRush __instance)
+        {
+            UpdateRushEraser(__instance);
+        }
+
+        private static void UpdateRushEraser(MenuScreenLevelRush instance)
+        {
+
+            TextMeshProUGUI buttonText = buttonEraseRush.GetComponentInChildren<TextMeshProUGUI>();
+            buttonText.SetText("Erase " + (LevelRush.LevelRushType) m_levelRushType.GetValue(instance) switch
+            {
+                LevelRush.LevelRushType.WhiteRush => "Whites ",
+                LevelRush.LevelRushType.MikeyRush => "Mikeys ",
+                LevelRush.LevelRushType.YellowRush => "Yellows ",
+                LevelRush.LevelRushType.RedRush => "Reds ",
+                LevelRush.LevelRushType.VioletRush => "Violets ",
+                _ => "Error"
+            } + (instance.heavenToggle.isOn ? "Heavenrush" : "Hellrush"));
+        }
+
+        private static void EraseRushAntiMissclick()
+        {
+            if (!Keyboard.current.leftCtrlKey.isPressed) return;
+
+            string[] levelRushLeaderboardNames = new string[]
+                {
+                    "HeavenRush",
+                    "RedRush",
+                    "VioletRush",
+                    "YellowRush",
+                    "MikeyRush"
+                };
+
+            MenuScreenLevelRush levelRushScreen = MainMenu.Instance()._screenLevelRush;
+            string rushType = levelRushLeaderboardNames[LevelRush.GetIndexFromRushType((LevelRush.LevelRushType)m_levelRushType.GetValue(levelRushScreen))];
+            string leaderboard = rushType + (levelRushScreen.heavenToggle.isOn ? "_heaven" : "_hell");
+            Debug.Log("Resetting " + leaderboard);
+
+            SteamAPICall_t hAPICall = SteamUserStats.FindOrCreateLeaderboard(leaderboard, ELeaderboardSortMethod.k_ELeaderboardSortMethodAscending, ELeaderboardDisplayType.k_ELeaderboardDisplayTypeTimeMilliSeconds);
+            var result = CallResult<LeaderboardFindResult_t>.Create
+            (new CallResult<LeaderboardFindResult_t>.APIDispatchDelegate
+                (OverrideRushScore));
+
+            result.Set(hAPICall);
+            findResults.Add(result);
+        }
+
+        private static void OverrideRushScore(LeaderboardFindResult_t pCallback, bool bIOFailure)
+        {
+            if (pCallback.m_bLeaderboardFound != 1 || bIOFailure)
+            {
+                Debug.LogError("No leaderboard fetched!");
+                return;
+            }
+
+            int nScore = 6000000;
+            int[] pScoreDetails = null;
+
+            LevelRush.LevelRushType levelRushType = LevelRush.GetCompletedLevelRushStats().levelRushType;
+            pScoreDetails = new int[]
+            {
+                0
+            };
+
+            SteamAPICall_t hAPICall = SteamUserStats.UploadLeaderboardScore(pCallback.m_hSteamLeaderboard, ELeaderboardUploadScoreMethod.k_ELeaderboardUploadScoreMethodForceUpdate, nScore, pScoreDetails, 1);
+            var result = CallResult<LeaderboardScoreUploaded_t>.Create
+                (new CallResult<LeaderboardScoreUploaded_t>.APIDispatchDelegate
+                (OnLeaderboardScoreUploaded2));
+
+            result.Set(hAPICall);
+            upload.Add(result);
         }
     }
 }

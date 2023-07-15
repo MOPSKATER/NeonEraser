@@ -19,4 +19,4 @@ using System.Runtime.InteropServices;
 // bereitgestellt wird.
 
 [assembly: Guid("ca4e48c3-6925-4a82-83c7-60d107138c0d")]
-[assembly: MelonInfo(typeof(NeonEraser.Eraser), "NeonEraser", "1.0.0", "MOPSKATER")]
+[assembly: MelonInfo(typeof(NeonEraser.Eraser), "NeonEraser", "1.1.0", "MOPSKATER")]
